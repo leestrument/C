@@ -27,6 +27,7 @@ void Free(arp* instance);
 
 /* method prototype */
 void stack(arp* instance, long n);
+void mode(arp* instance, long n);
 void list(arp* instance, t_symbol* s, long length, t_atom* list);
 void bang(arp* instance);
 void paint(arp* instance, t_object* view);
@@ -43,6 +44,7 @@ void ext_main(void *r) {
     
     // add methods.
     class_addmethod(arpClass, (method)stack, "stack", A_LONG, 0);
+    class_addmethod(arpClass, (method)mode, "mode", A_LONG, 0);
     class_addmethod(arpClass, (method)list, "list", A_GIMME, 0);
     class_addmethod(arpClass, (method)bang, "bang", 0);
     class_addmethod(arpClass, (method)paint, "paint", A_CANT, 0);
@@ -114,6 +116,12 @@ void stack(arp* instance, long n) {
     
 }
 
+void mode(arp* instance, long n) {
+    
+    instance->mode = n;
+    
+}
+
 void list(arp* instance, t_symbol* s, long length, t_atom* list) {
     
     // get pitch, velocity
@@ -173,7 +181,7 @@ void bang(arp* instance) {
     
     if (instance->noteIsPressed) {
         
-        // get note length.
+        /* get note length */
         long i;
         long noteLen = 0;
         
@@ -187,38 +195,100 @@ void bang(arp* instance) {
             
         }
         
-        // create noteout
+        /* create noteOut */
         long noteOut[noteLen][2];
         long noteIndex = 0;
-        
-        for (i = 0; i < 128; i++) {
+    
+        // down
+        if (instance->mode == 1) {
             
-            if (instance->noteIn[i] > 0) {
+            for (i = 127; i > 0; i--) {
                 
-                long pitch = i;
-                long velocity = instance->noteIn[i];
+                if (instance->noteIn[i] > 0) {
+                    
+                    long pitch = i;
+                    long velocity = instance->noteIn[i];
+                    
+                    noteOut[noteIndex][0] = pitch;
+                    noteOut[noteIndex][1] = velocity;
                 
-                noteOut[noteIndex][0] = pitch;
-                noteOut[noteIndex][1] = velocity;
-            
-                noteIndex++;
+                    noteIndex++;
+                    
+                }
                 
             }
             
         }
+    
+        // other ways.
+        else {
+            
+            /* make basic up direction first ! as default */
+            for (i = 0; i < 128; i++) {
+                
+                if (instance->noteIn[i] > 0) {
+                    
+                    long pitch = i;
+                    long velocity = instance->noteIn[i];
+                    
+                    noteOut[noteIndex][0] = pitch;
+                    noteOut[noteIndex][1] = velocity;
+                
+                    noteIndex++;
+                    
+                }
+                
+            }
         
-        // send noteout of current counter to outlet
+        }
+            
+        
+        /* init counter when counter is bigger than note length */
         if (instance->counter > noteLen - 1) {
             
             instance->counter = 0;
             
         }
         
+        /* outlet */
         outlet_int(instance->out_2, noteOut[instance->counter][1]);
         outlet_int(instance->out_1, noteOut[instance->counter][0]);
         
-        instance->counter++;
+        /* update counter */
+        /* But, don't update counter when just one note is pressed */
+        if (noteLen > 1) {
             
+            // up or down
+            if (instance->mode == 0 || instance->mode == 1) {
+             
+             instance->counter++;
+             
+            }
+
+            // random
+            else if (instance->mode == 2) {
+             
+             instance->counter = rand() % noteLen;
+
+            }
+
+            // random other
+            else if (instance->mode == 3) {
+             
+                long randomCounter = rand() % noteLen;
+
+                while (instance->counter == randomCounter) {
+
+                randomCounter = rand() % noteLen;
+                
+                }
+
+                instance->counter = randomCounter;
+             
+            }
+            
+        }
+        
     }
     
 }
