@@ -1,6 +1,5 @@
-#include "ext.h"
 // ---------------------------------------------------------------------------------------------//
-
+#include "ext.h"
 #include "ext_obex.h"
 #include "jpatcher_api.h"
 #include "jgraphics.h"
