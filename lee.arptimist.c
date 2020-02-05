@@ -15,7 +15,9 @@ typedef struct _lee
     long mode;
     long counter;
     long timer;
+    long timerInfinite;
     long direction;
+    void* out_5; // loop completed.
     void* out_4; // noteAmount
     void* out_3; // metro on or off
     void* out_2; // velocity
@@ -53,8 +55,12 @@ void count_random                   (lee* instance, long noteAmount);
 void count_random_other             (lee* instance, long noteAmount);
 void count_root_random              (lee* instance, long noteAmount);
 void count_low_random_high_random   (lee* instance, long noteAmount);
+void count_finger_crossed           (lee* instance, long noteAmount);
+void count_somewhere_up             (lee* instance, long noteAmount);
+void count_up_or_down               (lee* instance, long noteAmount);
 
-void (*setCounter[13])              (lee* instance, long noteAmount) = {
+
+void (*setCounter[16])              (lee* instance, long noteAmount) = {
     
     count_up,                       // 0
     count_down,                     // 1
@@ -68,7 +74,10 @@ void (*setCounter[13])              (lee* instance, long noteAmount) = {
     count_random,                   // 9
     count_random_other,             // 10
     count_root_random,              // 11
-    count_low_random_high_random    // 12
+    count_low_random_high_random,   // 12
+    count_finger_crossed,           // 13
+    count_somewhere_up,             // 14
+    count_up_or_down                // 15
     
 };
 
@@ -132,7 +141,9 @@ lee* create                         (t_symbol* s, short ac, t_atom* av)
     instance->mode = 0;
     instance->counter = 0;
     instance->timer = 0;
+    instance->timerInfinite = 0;
     instance->direction = 1;
+    instance->out_5 = intout(instance);
     instance->out_4 = intout(instance);
     instance->out_3 = intout(instance);
     instance->out_2 = intout(instance);
@@ -211,6 +222,13 @@ void list                           (lee* instance, t_symbol* s, long length, t_
 void bang                           (lee* instance)
 {
     if (instance->noteIsPressed) {
+                
+        // outlet bang if timer is 0. (It means one loop of counter is completed)
+        if (instance->timer == 0) {
+            
+            outlet_bang(instance->out_5);
+            
+        }
         
         // create noteAfterStack.
         long noteAfterStack[128] = {0, };
@@ -260,8 +278,10 @@ void bang                           (lee* instance)
         
         // get noteAmount.
         long noteAmount = getNoteAmount(instance);
-        
+    
         // increase timer
+        
+        instance->timerInfinite++;
         instance->timer++;
         
         if (instance->timer > noteAmount - 1) {
@@ -269,7 +289,7 @@ void bang                           (lee* instance)
             instance->timer = 0;
             
         }
-        
+                
         // control counter.
         switch (noteAmount) {
                 
@@ -322,26 +342,29 @@ void count_init                     (lee* instance, long noteAmount)
         
         switch (instance->mode) {
                 
-            case 0  : counter = 0; break;                    // up
-            case 1  : counter = noteAmount - 1; break;       // down
-            case 2  : counter = 0; break;                    // up and down
-            case 3  : counter = noteAmount - 1; break;       // down and up
-            case 4  : counter = 0; break;                    // low up high down
-            case 5  : counter = (noteAmount / 2) - 1; break; // low down high up
-            case 6  : counter = (noteAmount / 2) - 1; break; // low down high down
-            case 7  : counter = noteAmount - 1; break;       // high down low up
-            case 8  : counter = noteAmount / 2; break;       // high up low down
-            case 9  : counter = rand() % noteAmount; break;  // random
-            case 10 : counter = rand() % noteAmount; break;  // random other
-            case 11 : counter = 0; break;                    // root random
-            case 12 : counter = 0; break;                    // low random high random
-                
+            case 0  : counter = 0; break;                           // up
+            case 1  : counter = noteAmount - 1; break;              // down
+            case 2  : counter = 0; break;                           // up and down
+            case 3  : counter = noteAmount - 1; break;              // down and up
+            case 4  : counter = 0; break;                           // low up high down
+            case 5  : counter = (noteAmount / 2) - 1; break;        // low down high up
+            case 6  : counter = (noteAmount / 2) - 1; break;        // low down high down
+            case 7  : counter = noteAmount - 1; break;              // high down low up
+            case 8  : counter = noteAmount / 2; break;              // high up low down
+            case 9  : counter = rand() % noteAmount; break;         // random
+            case 10 : counter = rand() % noteAmount; break;         // random other
+            case 11 : counter = 0; break;                           // root random
+            case 12 : counter = 0; break;                           // low random high random
+            case 13 : counter = 0; break;                           // finger-crossed
+            case 14 : counter = 0; break;                           // somewhere up
+            case 15 : counter = rand() % (noteAmount - 2); break;   // up or down
         }
         
     }
     
     instance->counter = counter;
     instance->timer = 0;
+    instance->timerInfinite = 0;
     
 }
 
@@ -644,11 +667,7 @@ void count_root_random              (lee* instance, long noteAmount)
         instance->counter = 0;
         
     }
-    
-
-    
-    post("%ld", instance->timer);
-    
+        
 }
 
 void count_low_random_high_random   (lee* instance, long noteAmount)
@@ -683,3 +702,139 @@ void count_low_random_high_random   (lee* instance, long noteAmount)
     
 }
 
+void count_finger_crossed           (lee* instance, long noteAmount)
+{
+    
+    /* 현재 elegant 하지 않음. 그리고 시작음과 끝음, 한번도 나오지않게 다시 짜볼것*/
+    
+    
+    // 2 or 3 notes - just up.
+    if (noteAmount < 4) {
+        
+        instance->counter++;
+        
+        if (instance->counter > noteAmount - 1) {
+            
+            instance->counter = 0;
+            
+        }
+        
+    }
+    
+    else {
+        
+        // set direction
+        if (instance->counter == 0) {
+            
+            instance->direction = 1;
+            
+        }
+        
+        else if (instance->counter == noteAmount - 1) {
+            
+            instance->direction = -1;
+            
+        }
+        
+        // get offset.
+        long offset = 0;
+        
+        if (instance->timerInfinite % 3 == 0) {
+            
+            offset = 2;
+            
+        }
+        
+        // update counter.
+        instance->counter += instance->direction + (instance->direction * offset * -1);
+        
+        // if counter is out of range, change foreward or backward.
+        if (instance->counter == noteAmount) {
+            
+            instance->counter -= 1;
+            instance->direction = -1;
+            
+            
+        }
+        
+        else if (instance->counter == -1) {
+            
+            instance->counter = 0;
+            instance->direction = 1;
+            
+        }
+
+    }
+    
+}
+
+void count_somewhere_up             (lee* instance, long noteAmount)
+{
+    
+    // 2 or 3 notes - just up
+    if (noteAmount < 4) {
+        
+        instance->counter++;
+        
+        if (instance->counter > noteAmount - 1) {
+            
+            instance->counter = 0;
+            
+        }
+        
+    }
+    
+    else {
+        
+        if (instance->timerInfinite % 3 == 0) {
+            
+            long counter = rand() % (noteAmount - 2);
+            
+            while (instance->counter == counter) {
+                
+                counter = rand() % (noteAmount - 2);
+                
+            }
+            
+            instance->counter = counter;
+            
+        }
+        
+        else {
+            
+            instance->counter++;
+            
+        }
+        
+    }
+
+}
+
+void count_up_or_down               (lee* instance, long noteAmount)
+{
+    
+    if (instance->counter == 0) {
+        
+        instance->direction = 1;
+        
+    }
+    
+    else if (instance->counter != 0 && instance->timerInfinite % 5 == 0){
+        
+        long direction[2] = {-1, 1};
+
+        instance->direction = direction[rand() % 2];
+        
+
+    }
+        
+    instance->counter += instance->direction;
+    
+    if (instance->counter > noteAmount - 1) {
+        
+        instance->counter -= 2;
+        instance->direction = -1;
+        
+    }
+    
+}
